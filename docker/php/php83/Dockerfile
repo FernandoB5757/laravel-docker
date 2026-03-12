@@ -22,6 +22,7 @@ RUN apk add --no-cache --virtual .build-deps \
         libzip-dev \
         mariadb-client \
         oniguruma-dev \
+        openssh-client \
         openssl-dev \
         unzip \
         zip \
@@ -61,10 +62,13 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 RUN apk del .build-deps && rm -rf /var/cache/apk/* /tmp/*
 
 # Configure PHP-FPM
-COPY www.conf /usr/local/etc/php-fpm.d/www.conf
+COPY php83/www.conf /usr/local/etc/php-fpm.d/www.conf
+COPY entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 WORKDIR /var/www
 
 EXPOSE 9000
 
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["php-fpm"]

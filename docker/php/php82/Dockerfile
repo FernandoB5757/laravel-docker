@@ -9,7 +9,7 @@ RUN apk add --no-cache --virtual .build-deps \
     && apk add --no-cache \
         bash curl freetype-dev git icu-dev imagemagick-dev jpeg-dev \
         libjpeg-turbo-dev libpng-dev libwebp-dev libxpm-dev libzip-dev \
-        mariadb-client oniguruma-dev openssl-dev unzip zip zlib-dev
+        mariadb-client oniguruma-dev openssh-client openssl-dev unzip zip zlib-dev
 
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install -j$(nproc) \
@@ -21,7 +21,10 @@ RUN pecl install xdebug && docker-php-ext-enable xdebug
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 RUN apk del .build-deps && rm -rf /var/cache/apk/* /tmp/*
-COPY www.conf /usr/local/etc/php-fpm.d/www.conf
+COPY php82/www.conf /usr/local/etc/php-fpm.d/www.conf
+COPY entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 WORKDIR /var/www
 EXPOSE 9000
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["php-fpm"]
