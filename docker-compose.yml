@@ -373,6 +373,7 @@ services:
       - mariadb_data:/var/lib/mysql
       - ./docker/mariadb/conf.d/my.cnf:/etc/mysql/conf.d/my.cnf:ro
       - ./docker/mariadb/initdb.d:/docker-entrypoint-initdb.d:ro
+      - ./docker/mariadb/dumps:/dumps
     ports:
       - "${DB_PORT:-3306}:3306"
     networks:
