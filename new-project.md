@@ -375,3 +375,147 @@ docker exec -it php82 bash -c "cd /var/www/myapp && php artisan storage:link"
 
 # Done — open http://myapp.test
 ```
+
+---
+
+## Troubleshooting
+
+### `permission denied` running docker or docker compose
+
+Your user is not in the `docker` group. Add yourself and re-login:
+
+```bash
+sudo usermod -aG docker $USER
+# Then log out and log back in (or run: newgrp docker)
+docker ps   # should now work without sudo
+```
+
+---
+
+### Port 80 already in use — Traefik fails to start
+
+Another service is using port 80 (common culprits: Apache, nginx on the host, or another Traefik instance).
+
+```bash
+# Find what is using port 80
+sudo lsof -i :80
+
+# Stop the conflicting service, e.g.:
+sudo systemctl stop apache2
+sudo systemctl stop nginx
+
+# Then start the stack
+docker compose up -d
+```
+
+---
+
+### `*.test` domains don't resolve in the browser
+
+Run the one-time DNS setup script:
+
+```bash
+sudo ./scripts/setup-dns.sh
+```
+
+If you're on Ubuntu 24.04 and dnsmasq was already installed before running the script, run it again — it handles disabling `systemd-resolved`'s stub listener which conflicts with dnsmasq on port 53.
+
+Quick test:
+```bash
+ping -c1 anything.test   # should reply from 127.0.0.1
+```
+
+---
+
+### Database connection refused — `SQLSTATE[HY000] [2002] Connection refused`
+
+The most common cause is using `localhost` or `127.0.0.1` as `DB_HOST` in the project `.env`. Inside a container, those point to the container itself — not MariaDB.
+
+```env
+# Wrong
+DB_HOST=localhost
+
+# Correct — use the container name
+DB_HOST=mariadb
+```
+
+Same rule applies to Redis:
+```env
+# Correct
+REDIS_HOST=redis
+```
+
+After editing `.env`:
+```bash
+docker exec -it php82 bash -c "cd /var/www/myapp && php artisan config:clear"
+```
+
+---
+
+### Composer install — `Warning: Composer detected issues in your platform`
+
+This happens when Composer's platform requirements (extensions, PHP version) don't match what is installed in the container.
+
+**Fix A** — run composer inside the correct PHP container:
+```bash
+# Match the PHP version to your project's composer.json requirement
+docker exec -it php81 bash -c "cd /var/www/myapp && composer install"
+```
+
+**Fix B** — ignore platform checks temporarily (not recommended for production):
+```bash
+composer install --ignore-platform-reqs
+```
+
+**Fix C** — the warning about PSR-4 autoload on PHP 7.x + Composer 2 is cosmetic. It does not prevent the install from completing. Ignore it unless packages fail to load at runtime.
+
+---
+
+### `Host key verification failed` when running git/composer inside a container
+
+The container couldn't verify the SSH fingerprint of GitHub or Bitbucket. This is automatically fixed at build time (`ssh-keyscan` is run during the Docker image build). If you see this after a fresh build:
+
+```bash
+# Rebuild the affected container
+docker compose build --no-cache php82
+
+# Or add the keys manually inside the running container
+docker exec -it php82 ssh-keyscan github.com >> /root/.ssh/known_hosts
+docker exec -it php82 ssh-keyscan bitbucket.org >> /root/.ssh/known_hosts
+```
+
+---
+
+### Xdebug not working (PHP 7.0 / 7.1)
+
+PHP 7.0 and 7.1 use Xdebug 2.x, which does **not** support the `XDEBUG_MODE` environment variable. Toggling `XDEBUG_MODE=debug` in `.env` has no effect on these versions.
+
+To enable debugging on PHP 7.0 or 7.1, edit `docker/php/conf/xdebug-v2.ini` directly:
+
+```ini
+xdebug.remote_enable    = 1
+xdebug.remote_autostart = 1
+```
+
+Then restart the container:
+```bash
+docker compose restart php70
+```
+
+Configure your IDE to listen on port **9000** (not 9003).
+
+---
+
+### Storage / bootstrap/cache permission errors in Laravel
+
+If Laravel throws a `Permission denied` error writing to `storage/` or `bootstrap/cache/`, the entrypoint script sets permissions automatically on startup. If permissions are still wrong:
+
+```bash
+# Fix manually inside the container
+docker exec -it php82 bash -c "chmod -R 775 /var/www/myapp/storage /var/www/myapp/bootstrap/cache"
+```
+
+Or from the host:
+```bash
+chmod -R 775 projects/myapp/storage projects/myapp/bootstrap/cache
+```

@@ -1,0 +1,69 @@
+# ============================================================
+# PHP 8.x Tier — 8.0, 8.1, 8.2, and 8.3
+#
+# Build arguments (set per-version in docker-compose.yml):
+#   PHP_VERSION — 8.0 | 8.1 | 8.2 | 8.3
+# ============================================================
+ARG PHP_VERSION=8.3
+
+FROM php:${PHP_VERSION}-fpm-alpine
+
+ARG PHP_VERSION
+
+LABEL maintainer="Laravel Docker Platform"
+LABEL php.version="${PHP_VERSION}"
+
+# Build-time dependencies (removed after install) + runtime packages
+RUN apk add --no-cache --virtual .build-deps \
+        $PHPIZE_DEPS \
+        linux-headers \
+    && apk add --no-cache \
+        bash \
+        curl \
+        freetype-dev \
+        git \
+        icu-dev \
+        imagemagick-dev \
+        jpeg-dev \
+        libjpeg-turbo-dev \
+        libpng-dev \
+        libwebp-dev \
+        libxpm-dev \
+        libzip-dev \
+        mariadb-client \
+        oniguruma-dev \
+        openssh-client \
+        openssl-dev \
+        unzip \
+        zip \
+        zlib-dev
+
+# PHP extensions
+RUN docker-php-ext-configure gd \
+        --with-freetype \
+        --with-jpeg \
+        --with-webp \
+    && docker-php-ext-install -j$(nproc) \
+        bcmath exif gd intl mbstring opcache pdo pdo_mysql pcntl sockets zip
+
+# PECL extensions
+RUN pecl install redis   && docker-php-ext-enable redis
+RUN pecl install imagick && docker-php-ext-enable imagick
+RUN pecl install xdebug  && docker-php-ext-enable xdebug
+
+# Composer 2.x
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# SSH known hosts for GitHub and Bitbucket (avoids host key prompts)
+RUN ssh-keyscan github.com bitbucket.org >> /etc/ssh/ssh_known_hosts 2>/dev/null || true
+
+RUN apk del .build-deps && rm -rf /var/cache/apk/* /tmp/*
+
+COPY conf/www.conf   /usr/local/etc/php-fpm.d/www.conf
+COPY entrypoint.sh   /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+WORKDIR /var/www
+EXPOSE 9000
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["php-fpm"]

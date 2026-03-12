@@ -1,0 +1,66 @@
+# ============================================================
+# PHP Legacy Tier — 7.0 and 7.1
+#
+# Build arguments (set per-version in docker-compose.yml):
+#   PHP_VERSION     — 7.0 | 7.1
+#   XDEBUG_VERSION  — 2.7.2 (7.0) | 2.9.8 (7.1)
+# ============================================================
+ARG PHP_VERSION=7.1
+ARG XDEBUG_VERSION=2.9.8
+
+FROM php:${PHP_VERSION}-fpm-alpine
+
+ARG PHP_VERSION
+ARG XDEBUG_VERSION
+
+LABEL maintainer="Laravel Docker Platform"
+LABEL php.version="${PHP_VERSION}"
+
+# Build-time dependencies (removed after install) + runtime packages
+RUN apk add --no-cache --virtual .build-deps \
+        $PHPIZE_DEPS \
+    && apk add --no-cache \
+        bash \
+        curl \
+        freetype-dev \
+        git \
+        icu-dev \
+        imagemagick-dev \
+        jpeg-dev \
+        libjpeg-turbo-dev \
+        libpng-dev \
+        mariadb-client \
+        openssh-client \
+        openssl-dev \
+        unzip \
+        zip \
+        zlib-dev
+
+# PHP extensions
+RUN docker-php-ext-configure gd \
+        --with-freetype-dir=/usr \
+        --with-jpeg-dir=/usr \
+    && docker-php-ext-install -j$(nproc) \
+        bcmath exif gd intl mbstring opcache pdo pdo_mysql pcntl sockets zip
+
+# PECL extensions
+RUN pecl install redis-4.3.0  && docker-php-ext-enable redis
+RUN pecl install imagick       && docker-php-ext-enable imagick
+RUN pecl install xdebug-${XDEBUG_VERSION} && docker-php-ext-enable xdebug
+
+# Composer 1.x (last version to support PHP 7.0/7.1 officially)
+COPY --from=composer:1 /usr/bin/composer /usr/bin/composer
+
+# SSH known hosts for GitHub and Bitbucket (avoids host key prompts)
+RUN ssh-keyscan github.com bitbucket.org >> /etc/ssh/ssh_known_hosts 2>/dev/null || true
+
+RUN apk del .build-deps && rm -rf /var/cache/apk/* /tmp/*
+
+COPY conf/www.conf   /usr/local/etc/php-fpm.d/www.conf
+COPY entrypoint.sh   /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+WORKDIR /var/www
+EXPOSE 9000
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["php-fpm"]

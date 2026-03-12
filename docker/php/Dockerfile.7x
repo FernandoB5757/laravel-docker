@@ -1,0 +1,71 @@
+# ============================================================
+# PHP 7.x Modern Tier — 7.2, 7.3, and 7.4
+#
+# Build arguments (set per-version in docker-compose.yml):
+#   PHP_VERSION         — 7.2 | 7.3 | 7.4
+#   GD_CONFIGURE_FLAGS  — GD configure flags (differ between 7.2/7.3 and 7.4)
+#
+# GD configure flags by version:
+#   7.2 / 7.3 → --with-freetype-dir=/usr --with-jpeg-dir=/usr
+#   7.4       → --with-freetype --with-jpeg
+# ============================================================
+ARG PHP_VERSION=7.4
+ARG GD_CONFIGURE_FLAGS="--with-freetype --with-jpeg"
+
+FROM php:${PHP_VERSION}-fpm-alpine
+
+ARG PHP_VERSION
+ARG GD_CONFIGURE_FLAGS
+
+LABEL maintainer="Laravel Docker Platform"
+LABEL php.version="${PHP_VERSION}"
+
+# Build-time dependencies (removed after install) + runtime packages
+RUN apk add --no-cache --virtual .build-deps \
+        $PHPIZE_DEPS \
+        linux-headers \
+    && apk add --no-cache \
+        bash \
+        curl \
+        freetype-dev \
+        git \
+        icu-dev \
+        imagemagick-dev \
+        jpeg-dev \
+        libjpeg-turbo-dev \
+        libpng-dev \
+        libzip-dev \
+        mariadb-client \
+        oniguruma-dev \
+        openssh-client \
+        openssl-dev \
+        unzip \
+        zip \
+        zlib-dev
+
+# PHP extensions
+RUN docker-php-ext-configure gd ${GD_CONFIGURE_FLAGS} \
+    && docker-php-ext-install -j$(nproc) \
+        bcmath exif gd intl mbstring opcache pdo pdo_mysql pcntl sockets zip
+
+# PECL extensions
+RUN pecl install redis-5.3.7 && docker-php-ext-enable redis
+RUN pecl install imagick      && docker-php-ext-enable imagick
+RUN pecl install xdebug-3.1.6 && docker-php-ext-enable xdebug
+
+# Composer 2.x
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# SSH known hosts for GitHub and Bitbucket (avoids host key prompts)
+RUN ssh-keyscan github.com bitbucket.org >> /etc/ssh/ssh_known_hosts 2>/dev/null || true
+
+RUN apk del .build-deps && rm -rf /var/cache/apk/* /tmp/*
+
+COPY conf/www.conf   /usr/local/etc/php-fpm.d/www.conf
+COPY entrypoint.sh   /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+WORKDIR /var/www
+EXPOSE 9000
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["php-fpm"]

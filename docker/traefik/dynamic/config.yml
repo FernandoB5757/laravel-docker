@@ -11,13 +11,77 @@
 
 # Example: HTTP → HTTPS redirect middleware
 http:
+  # ── Routers ────────────────────────────────────────────────────────────────
+  routers:
+    # All *.test domains → Nginx (which dispatches by server_name)
+    nginx-catch-all:
+      rule: "HostRegexp(`[a-z0-9-]+\\.test`)"
+      entrypoints:
+        - web
+      service: nginx-svc
+      priority: 1
+
+    # phpMyAdmin
+    pma:
+      rule: "Host(`pma.test`)"
+      entrypoints:
+        - web
+      service: pma-svc
+      priority: 10
+
+    # Mailhog
+    mailhog:
+      rule: "Host(`mail.test`)"
+      entrypoints:
+        - web
+      service: mailhog-svc
+      priority: 10
+
+    # Meilisearch
+    meilisearch:
+      rule: "Host(`meilisearch.test`)"
+      entrypoints:
+        - web
+      service: meilisearch-svc
+      priority: 10
+
+    # Traefik dashboard
+    traefik-dashboard:
+      rule: "Host(`traefik.test`)"
+      entrypoints:
+        - web
+      service: api@internal
+      priority: 10
+
+  # ── Services (static IPs from docker-compose subnet) ───────────────────────
+  services:
+    nginx-svc:
+      loadBalancer:
+        servers:
+          - url: "http://172.20.0.3:80"
+
+    pma-svc:
+      loadBalancer:
+        servers:
+          - url: "http://172.20.0.24:80"
+
+    mailhog-svc:
+      loadBalancer:
+        servers:
+          - url: "http://172.20.0.23:8025"
+
+    meilisearch-svc:
+      loadBalancer:
+        servers:
+          - url: "http://172.20.0.22:7700"
+
+  # ── Middlewares ─────────────────────────────────────────────────────────────
   middlewares:
     redirect-to-https:
       redirectScheme:
         scheme: https
         permanent: false
 
-    # Secure headers middleware
     secure-headers:
       headers:
         frameDeny: true
