@@ -69,7 +69,6 @@ services:
       - ./projects:/var/www:ro
       - ./docker/nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
-      - php56
       - php70
       - php71
       - php72
@@ -357,36 +356,6 @@ services:
     networks:
       laravel_network:
         ipv4_address: 172.20.0.18
-
-  ###############################################################################
-  # PHP 5.6 — FPM
-  ###############################################################################
-  php56:
-    build:
-      context: ./docker/php/php56
-      dockerfile: Dockerfile
-    container_name: php56
-    restart: unless-stopped
-    volumes:
-      - ./projects:/var/www
-      - ./docker/php/php56/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
-      - ./docker/php/php56/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
-      - composer_cache:/root/.composer/cache
-    environment:
-      - PHP_VERSION=5.6
-      - XDEBUG_MODE=${XDEBUG_MODE:-off}
-      - XDEBUG_CLIENT_HOST=${XDEBUG_CLIENT_HOST:-host-gateway}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    healthcheck:
-      test: ["CMD", "php", "-r", "exit(0);"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-    networks:
-      laravel_network:
-        ipv4_address: 172.20.0.19
 
   ###############################################################################
   # MARIADB — Single shared instance
