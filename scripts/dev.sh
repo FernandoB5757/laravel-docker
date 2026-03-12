@@ -215,6 +215,35 @@ ENVEOF
         ;;
 
     # -------------------------------------------------------
+    # Import a SQL dump into a database on running MariaDB
+    # Usage: ./dev.sh db-import <database> <file.sql>
+    # File must be inside docker/mariadb/dumps/ on the host
+    # (mounted at /dumps inside the container)
+    # -------------------------------------------------------
+    db-import)
+        DB_NAME="${2:?Usage: db-import <database> <file.sql>}"
+        SQL_FILE="${3:?Usage: db-import <database> <file.sql>}"
+        DB_USER="$(grep '^DB_USERNAME=' "$ROOT_DIR/.env" | cut -d= -f2)"
+        DB_PASS="$(grep '^DB_PASSWORD=' "$ROOT_DIR/.env" | cut -d= -f2)"
+        if [ -z "$DB_USER" ]; then DB_USER="laravel"; fi
+        if [ -z "$DB_PASS" ]; then DB_PASS="secret"; fi
+
+        # Accept either a bare filename or a full path — only the basename matters
+        BASENAME="$(basename "$SQL_FILE")"
+        HOST_PATH="${ROOT_DIR}/docker/mariadb/dumps/${BASENAME}"
+
+        if [ ! -f "$HOST_PATH" ]; then
+            print_error "File not found: ${HOST_PATH}"
+            echo "Place your .sql file inside docker/mariadb/dumps/ first."
+            exit 1
+        fi
+
+        echo "Importing ${BASENAME} into database '${DB_NAME}'..."
+        docker exec -i mariadb mariadb -u"${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" < "${HOST_PATH}"
+        print_success "Import complete: ${BASENAME} → ${DB_NAME}"
+        ;;
+
+    # -------------------------------------------------------
     # Rebuild a specific PHP image
     # Usage: ./dev.sh rebuild php82
     # -------------------------------------------------------
@@ -259,7 +288,8 @@ ENVEOF
         echo "  xdebug-on                       Enable Xdebug (PHP 7.2+ only)"
         echo "  xdebug-off                      Disable Xdebug"
         echo "  new-project <name> <php>        Scaffold a new project"
-        echo "  db-create <database>            Create DB on running MariaDB"
+        echo "  db-create <database>            Create DB on running MariaDB
+  db-import <database> <file>    Import .sql from docker/mariadb/dumps/ into DB"
         echo "  rebuild <service>               Rebuild and restart a service"
         echo "  logs [service]                  Tail service logs"
         echo "  status                          Show container status"

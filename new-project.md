@@ -10,7 +10,7 @@
 |---|---|---|
 | 1 | Create project folder | `mkdir projects/myapp` |
 | 2 | Clone or create Laravel app | `git clone` / `composer create-project` |
-| 3 | Create the database | `docker exec mariadb mysql ...` |
+| 3 | Create the database | `./scripts/dev.sh db-create myapp` |
 | 4 | Configure Nginx vhost | Copy template, set PHP version |
 | 5 | Reload Nginx | `docker exec nginx nginx -s reload` |
 | 6 | Copy and edit `.env` | Set DB, Redis, Mail, Meili hosts |
@@ -99,11 +99,17 @@ ls projects/myapp/public/index.php
 
 ```bash
 # Run composer create-project inside the php82 container
-docker exec -it php82 bash -c \
+docker exec -it $PHP_VERSION bash -c \
   "composer create-project laravel/laravel /var/www/myapp"
 ```
 
 > **Note:** The Nginx container mounts `projects/` as `/var/www/` (read-only). Your code on the host is instantly visible inside all containers — no rebuild needed.
+
+### Configure git safe directory
+
+```bash
+docker exec -it $PHP_VERSION bash -c "git config --global --add safe.directory /var/www/myapp"
+```
 
 ---
 
@@ -114,15 +120,31 @@ docker exec -it php82 bash -c \
 
 ```bash
 # Create the database
-docker exec -it mariadb mysql -uroot -psecret -e \
-  "CREATE DATABASE myapp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-
-# Grant permissions to the shared laravel user
-docker exec -it mariadb mysql -uroot -psecret -e \
-  "GRANT ALL PRIVILEGES ON myapp.* TO 'laravel'@'%'; FLUSH PRIVILEGES;"
+./scripts/dev.sh db-create myapp
 ```
 
 > The `laravel` user is already created when the environment starts. You only need to create the database and grant access.
+
+### Option — Import from a SQL dump
+
+If you have an existing database dump, place it in `docker/mariadb/dumps/` and import it:
+
+```bash
+# 1. Copy the dump
+cp /path/to/your/dump.sql docker/mariadb/dumps/
+
+# 2. Create the database (if it doesn't exist yet)
+./scripts/dev.sh db-create myapp
+
+# 3. Import
+./scripts/dev.sh db-import myapp dump.sql
+```
+
+> The `dumps/` folder is mounted at `/dumps` inside the MariaDB container. You can also exec in manually if needed:
+>
+> ```bash
+> docker exec -i mariadb mariadb -u laravel -p secret myapp < docker/mariadb/dumps/dump.sql
+> ```
 
 ---
 
@@ -254,6 +276,7 @@ MEILISEARCH_KEY=masterkey
 ```
 
 > **After editing `.env`** always run:
+>
 > ```bash
 > php artisan config:clear && php artisan cache:clear
 > ```
@@ -319,7 +342,7 @@ chmod -R 775 storage bootstrap/cache
 php artisan optimize:clear
 ```
 
-Then open your browser at **http://myapp.test** ✓
+Then open your browser at **<http://myapp.test>** ✓
 
 ---
 
@@ -333,10 +356,7 @@ mkdir -p projects/myapp
 git clone https://github.com/yourorg/myapp.git projects/myapp
 
 # 2. Create database
-docker exec -it mariadb mysql -uroot -psecret -e \
-  "CREATE DATABASE myapp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-docker exec -it mariadb mysql -uroot -psecret -e \
-  "GRANT ALL PRIVILEGES ON myapp.* TO 'laravel'@'%'; FLUSH PRIVILEGES;"
+./scripts/dev.sh db-create myapp
 
 # 3. Create nginx vhost (then edit it — set server_name, root, fastcgi_pass)
 cp docker/nginx/conf.d/_template.conf.example docker/nginx/conf.d/myapp.conf
