@@ -21,6 +21,48 @@
 
 ---
 
+## Step 0 — Register the Domain
+
+Every new project needs its `*.test` domain to resolve to `127.0.0.1` on your machine. You have two options:
+
+### Option A — Automatic (recommended, one-time setup)
+
+If you already ran `setup-dns.sh` when you first installed the platform, **you don't need to do anything here**. All `*.test` domains resolve automatically — skip to Step 1.
+
+```bash
+# Verify dnsmasq is running and resolving *.test
+ping -c1 myapp.test
+# Expected: 64 bytes from 127.0.0.1
+```
+
+If it doesn't resolve, restart dnsmasq:
+
+```bash
+sudo systemctl restart dnsmasq
+```
+
+### Option B — Manual via `/etc/hosts` (quick alternative, per project)
+
+If you skipped the dnsmasq setup or are on a machine where you can't run it, add the domain manually:
+
+```bash
+# Add the entry
+echo "127.0.0.1   myapp.test" | sudo tee -a /etc/hosts
+
+# Verify
+ping -c1 myapp.test
+```
+
+To remove it later:
+
+```bash
+sudo sed -i '/myapp\.test/d' /etc/hosts
+```
+
+> **Note:** Option B requires one manual edit per project. Option A (dnsmasq) handles all current and future `*.test` domains with zero configuration. To set it up run `sudo ./scripts/setup-dns.sh` from the workspace root.
+
+---
+
 ## Step 1 — Create the Project Folder
 
 All projects live inside the `projects/` folder at the root of the Docker workspace. Each subfolder is one site.
