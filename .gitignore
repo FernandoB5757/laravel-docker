@@ -1,0 +1,30 @@
+# Environment — copy from docker/.env.example
+.env
+
+# Docker volumes (not tracked)
+docker/mariadb/data/
+
+# SSL certificates — generated locally, never committed
+docker/traefik/certs/*.crt
+docker/traefik/certs/*.key
+docker/traefik/certs/*.pem
+docker/nginx/ssl/*.crt
+docker/nginx/ssl/*.key
+docker/nginx/ssl/*.pem
+# Keep the placeholder directories
+!docker/traefik/certs/.gitkeep
+!docker/nginx/ssl/.gitkeep
+
+# Project code — developers bring their own Laravel apps
+projects/*/
+!projects/.gitkeep
+!projects/project1/.env.example
+!projects/project2/.env.example
+
+# Logs
+*.log
+docker/nginx/logs/
+
+# OS
+.DS_Store
+Thumbs.db

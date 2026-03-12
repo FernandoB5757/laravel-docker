@@ -1,0 +1,25 @@
+# ============================================================
+# Traefik Dynamic Configuration
+# Place TLS certificates and middleware here
+# ============================================================
+
+# Uncomment to enable TLS with self-signed certificates
+# tls:
+#   certificates:
+#     - certFile: /certs/local.crt
+#       keyFile: /certs/local.key
+
+# Example: HTTP → HTTPS redirect middleware
+http:
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: false
+
+    # Secure headers middleware
+    secure-headers:
+      headers:
+        frameDeny: true
+        browserXssFilter: true
+        contentTypeNosniff: true

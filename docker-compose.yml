@@ -1,0 +1,481 @@
+###############################################################################
+# Laravel Docker Development Platform
+# Professional multi-project, multi-PHP-version environment
+###############################################################################
+
+networks:
+  laravel_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  mariadb_data:
+    driver: local
+  redis_data:
+    driver: local
+  meilisearch_data:
+    driver: local
+  composer_cache:
+    driver: local
+
+services:
+
+  ###############################################################################
+  # TRAEFIK — Reverse Proxy + Automatic *.test Domain Routing
+  ###############################################################################
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--log.level=INFO"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"   # Traefik dashboard
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./docker/traefik/dynamic:/etc/traefik/dynamic:ro"
+      - "./docker/traefik/certs:/certs:ro"
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.2
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.test`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=web"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+
+  ###############################################################################
+  # NGINX — Central Web Server (FastCGI to PHP-FPM containers)
+  ###############################################################################
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: nginx
+    restart: unless-stopped
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./projects:/var/www:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - php56
+      - php70
+      - php71
+      - php72
+      - php73
+      - php74
+      - php80
+      - php81
+      - php82
+      - php83
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nginx.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.test`)"
+      - "traefik.http.routers.nginx.entrypoints=web"
+      - "traefik.http.services.nginx.loadbalancer.server.port=80"
+
+  ###############################################################################
+  # PHP 8.3 — FPM
+  ###############################################################################
+  php83:
+    build:
+      context: ./docker/php/php83
+      dockerfile: Dockerfile
+    container_name: php83
+    restart: unless-stopped
+    volumes:
+      - ./projects:/var/www
+      - ./docker/php/php83/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+      - ./docker/php/php83/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
+      - composer_cache:/root/.composer/cache
+    environment:
+      - PHP_VERSION=8.3
+      - XDEBUG_MODE=${XDEBUG_MODE:-off}
+      - XDEBUG_CLIENT_HOST=${XDEBUG_CLIENT_HOST:-host-gateway}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(0);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.10
+
+  ###############################################################################
+  # PHP 8.2 — FPM
+  ###############################################################################
+  php82:
+    build:
+      context: ./docker/php/php82
+      dockerfile: Dockerfile
+    container_name: php82
+    restart: unless-stopped
+    volumes:
+      - ./projects:/var/www
+      - ./docker/php/php82/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+      - ./docker/php/php82/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
+      - composer_cache:/root/.composer/cache
+    environment:
+      - PHP_VERSION=8.2
+      - XDEBUG_MODE=${XDEBUG_MODE:-off}
+      - XDEBUG_CLIENT_HOST=${XDEBUG_CLIENT_HOST:-host-gateway}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(0);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.11
+
+  ###############################################################################
+  # PHP 8.1 — FPM
+  ###############################################################################
+  php81:
+    build:
+      context: ./docker/php/php81
+      dockerfile: Dockerfile
+    container_name: php81
+    restart: unless-stopped
+    volumes:
+      - ./projects:/var/www
+      - ./docker/php/php81/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+      - ./docker/php/php81/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
+      - composer_cache:/root/.composer/cache
+    environment:
+      - PHP_VERSION=8.1
+      - XDEBUG_MODE=${XDEBUG_MODE:-off}
+      - XDEBUG_CLIENT_HOST=${XDEBUG_CLIENT_HOST:-host-gateway}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(0);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.12
+
+  ###############################################################################
+  # PHP 8.0 — FPM
+  ###############################################################################
+  php80:
+    build:
+      context: ./docker/php/php80
+      dockerfile: Dockerfile
+    container_name: php80
+    restart: unless-stopped
+    volumes:
+      - ./projects:/var/www
+      - ./docker/php/php80/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+      - ./docker/php/php80/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
+      - composer_cache:/root/.composer/cache
+    environment:
+      - PHP_VERSION=8.0
+      - XDEBUG_MODE=${XDEBUG_MODE:-off}
+      - XDEBUG_CLIENT_HOST=${XDEBUG_CLIENT_HOST:-host-gateway}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(0);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.13
+
+  ###############################################################################
+  # PHP 7.4 — FPM
+  ###############################################################################
+  php74:
+    build:
+      context: ./docker/php/php74
+      dockerfile: Dockerfile
+    container_name: php74
+    restart: unless-stopped
+    volumes:
+      - ./projects:/var/www
+      - ./docker/php/php74/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+      - ./docker/php/php74/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
+      - composer_cache:/root/.composer/cache
+    environment:
+      - PHP_VERSION=7.4
+      - XDEBUG_MODE=${XDEBUG_MODE:-off}
+      - XDEBUG_CLIENT_HOST=${XDEBUG_CLIENT_HOST:-host-gateway}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(0);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.14
+
+  ###############################################################################
+  # PHP 7.3 — FPM
+  ###############################################################################
+  php73:
+    build:
+      context: ./docker/php/php73
+      dockerfile: Dockerfile
+    container_name: php73
+    restart: unless-stopped
+    volumes:
+      - ./projects:/var/www
+      - ./docker/php/php73/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+      - ./docker/php/php73/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
+      - composer_cache:/root/.composer/cache
+    environment:
+      - PHP_VERSION=7.3
+      - XDEBUG_MODE=${XDEBUG_MODE:-off}
+      - XDEBUG_CLIENT_HOST=${XDEBUG_CLIENT_HOST:-host-gateway}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(0);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.15
+
+  ###############################################################################
+  # PHP 7.2 — FPM
+  ###############################################################################
+  php72:
+    build:
+      context: ./docker/php/php72
+      dockerfile: Dockerfile
+    container_name: php72
+    restart: unless-stopped
+    volumes:
+      - ./projects:/var/www
+      - ./docker/php/php72/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+      - ./docker/php/php72/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
+      - composer_cache:/root/.composer/cache
+    environment:
+      - PHP_VERSION=7.2
+      - XDEBUG_MODE=${XDEBUG_MODE:-off}
+      - XDEBUG_CLIENT_HOST=${XDEBUG_CLIENT_HOST:-host-gateway}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(0);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.16
+
+  ###############################################################################
+  # PHP 7.1 — FPM
+  ###############################################################################
+  php71:
+    build:
+      context: ./docker/php/php71
+      dockerfile: Dockerfile
+    container_name: php71
+    restart: unless-stopped
+    volumes:
+      - ./projects:/var/www
+      - ./docker/php/php71/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+      - ./docker/php/php71/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
+      - composer_cache:/root/.composer/cache
+    environment:
+      - PHP_VERSION=7.1
+      - XDEBUG_MODE=${XDEBUG_MODE:-off}
+      - XDEBUG_CLIENT_HOST=${XDEBUG_CLIENT_HOST:-host-gateway}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(0);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.17
+
+  ###############################################################################
+  # PHP 7.0 — FPM
+  ###############################################################################
+  php70:
+    build:
+      context: ./docker/php/php70
+      dockerfile: Dockerfile
+    container_name: php70
+    restart: unless-stopped
+    volumes:
+      - ./projects:/var/www
+      - ./docker/php/php70/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+      - ./docker/php/php70/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
+      - composer_cache:/root/.composer/cache
+    environment:
+      - PHP_VERSION=7.0
+      - XDEBUG_MODE=${XDEBUG_MODE:-off}
+      - XDEBUG_CLIENT_HOST=${XDEBUG_CLIENT_HOST:-host-gateway}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(0);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.18
+
+  ###############################################################################
+  # PHP 5.6 — FPM
+  ###############################################################################
+  php56:
+    build:
+      context: ./docker/php/php56
+      dockerfile: Dockerfile
+    container_name: php56
+    restart: unless-stopped
+    volumes:
+      - ./projects:/var/www
+      - ./docker/php/php56/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+      - ./docker/php/php56/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
+      - composer_cache:/root/.composer/cache
+    environment:
+      - PHP_VERSION=5.6
+      - XDEBUG_MODE=${XDEBUG_MODE:-off}
+      - XDEBUG_CLIENT_HOST=${XDEBUG_CLIENT_HOST:-host-gateway}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(0);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.19
+
+  ###############################################################################
+  # MARIADB — Single shared instance
+  ###############################################################################
+  mariadb:
+    image: mariadb:10.11
+    container_name: mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-secret}
+      MYSQL_DATABASE: ${DB_DATABASE:-laravel}
+      MYSQL_USER: ${DB_USERNAME:-laravel}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./docker/mariadb/conf.d/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+      - ./docker/mariadb/initdb.d:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.20
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ###############################################################################
+  # REDIS — Cache, Queues, Sessions
+  ###############################################################################
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.21
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  ###############################################################################
+  # MEILISEARCH — Full-text search for Laravel Scout
+  ###############################################################################
+  meilisearch:
+    image: getmeili/meilisearch:v1.6
+    container_name: meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILISEARCH_KEY:-masterkey}
+      MEILI_ENV: development
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meilisearch_data:/meili_data
+    ports:
+      - "${MEILISEARCH_PORT:-7700}:7700"
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.22
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.meilisearch.rule=Host(`meilisearch.test`)"
+      - "traefik.http.routers.meilisearch.entrypoints=web"
+      - "traefik.http.services.meilisearch.loadbalancer.server.port=7700"
+
+  ###############################################################################
+  # MAILHOG — SMTP Testing / Mail Catching
+  ###############################################################################
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    restart: unless-stopped
+    ports:
+      - "${MAIL_PORT:-1025}:1025"    # SMTP
+      - "${MAILHOG_PORT:-8025}:8025" # Web UI
+    networks:
+      laravel_network:
+        ipv4_address: 172.20.0.23
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mailhog.rule=Host(`mail.test`)"
+      - "traefik.http.routers.mailhog.entrypoints=web"
+      - "traefik.http.services.mailhog.loadbalancer.server.port=8025"

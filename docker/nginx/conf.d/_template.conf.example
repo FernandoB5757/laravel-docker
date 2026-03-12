@@ -1,0 +1,50 @@
+###############################################################################
+# NGINX VHOST TEMPLATE
+# Copy this file to conf.d/<projectname>.conf
+# Replace ALL occurrences of:
+#   - "PROJECTNAME"  → your project folder name (e.g. crm, api, legacy)
+#   - "PHPVERSION"   → target PHP upstream (e.g. php83, php82, php56)
+###############################################################################
+server {
+    listen 80;
+    server_name PROJECTNAME.test;
+
+    root /var/www/PROJECTNAME/public;
+    index index.php index.html;
+
+    charset utf-8;
+    access_log /var/log/nginx/PROJECTNAME-access.log main;
+    error_log  /var/log/nginx/PROJECTNAME-error.log warn;
+
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-XSS-Protection "1; mode=block";
+    add_header X-Content-Type-Options "nosniff";
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        try_files $uri =404;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+
+        fastcgi_pass PHPVERSION;              # ← Set PHP version here
+        fastcgi_index index.php;
+
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        fastcgi_param DOCUMENT_ROOT   $realpath_root;
+
+        fastcgi_hide_header X-Powered-By;
+        fastcgi_read_timeout 300;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
