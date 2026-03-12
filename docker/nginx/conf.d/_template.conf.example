@@ -3,7 +3,7 @@
 # Copy this file to conf.d/<projectname>.conf
 # Replace ALL occurrences of:
 #   - "PROJECTNAME"  → your project folder name (e.g. crm, api, legacy)
-#   - "PHPVERSION"   → target PHP upstream (e.g. php83, php82, php56)
+#   - "PHPVERSION"   → target PHP upstream (e.g. php83, php82)
 ###############################################################################
 server {
     listen 80;

@@ -23,7 +23,7 @@ Designed as a complete replacement for Laravel Homestead — faster, more modula
                         │               └──┬──────────────┬──┘    │
                         │                  │              │        │
                         │         ┌────────▼──┐    ┌──────▼────┐  │
-                        │         │  PHP 8.2  │    │  PHP 5.6  │  │
+                        │         │  PHP 8.2  │    │  PHP 7.0  │  │
                         │         │  FPM      │    │  FPM      │  │
                         │         │ (project1)│    │ (project2)│  │
                         │         └─────┬─────┘    └─────┬─────┘  │
@@ -61,7 +61,6 @@ workspace/
 │   │   └── conf.d/
 │   │       ├── upstreams.conf  # PHP-FPM upstream pool definitions
 │   │       ├── project1.conf   # project1.test → PHP 8.2
-│   │       ├── project2.conf   # project2.test → PHP 5.6
 │   │       └── _template.conf.example  # Template for new projects
 │   │
 │   ├── php/
@@ -77,8 +76,7 @@ workspace/
 │   │   ├── php73/              # PHP 7.3 FPM container
 │   │   ├── php72/              # PHP 7.2 FPM container
 │   │   ├── php71/              # PHP 7.1 FPM container
-│   │   ├── php70/              # PHP 7.0 FPM container
-│   │   └── php56/              # PHP 5.6 FPM container (Debian)
+│   │   └── php70/              # PHP 7.0 FPM container
 │   │
 │   ├── mariadb/
 │   │   ├── conf.d/my.cnf       # MariaDB tuning config
@@ -92,8 +90,7 @@ workspace/
 │       └── certs/              # SSL certificate storage
 │
 ├── projects/                   # Your Laravel projects live here
-│   ├── project1/               # project1.test (PHP 8.2)
-│   └── project2/               # project2.test (PHP 5.6)
+│   └── project1/               # project1.test (PHP 8.2)
 │
 └── scripts/
     ├── dev.sh                  # Developer helper CLI
@@ -320,7 +317,6 @@ MEILISEARCH_HOST=http://meilisearch:7700
 | PHP 7.2        | `php72`       | `php72`        | 9000 (internal) | -                            |
 | PHP 7.1        | `php71`       | `php71`        | 9000 (internal) | -                            |
 | PHP 7.0        | `php70`       | `php70`        | 9000 (internal) | -                            |
-| PHP 5.6        | `php56`       | `php56`        | 9000 (internal) | -                            |
 | MariaDB        | `mariadb`     | `mariadb`      | 3306            | (DB client: localhost:3306)  |
 | Redis          | `redis`       | `redis`        | 6379            | (Redis client: localhost:6379)|
 | Meilisearch    | `meilisearch` | `meilisearch`  | 7700            | http://meilisearch.test      |
@@ -352,7 +348,7 @@ docker compose up -d
 ### IDE Setup (PhpStorm)
 
 1. Go to **Settings → PHP → Debug**
-2. Set **Debug port** to `9003` (Xdebug 3.x) or `9000` (PHP 5.6/7.0/7.1)
+2. Set **Debug port** to `9003` (Xdebug 3.x) or `9000` (PHP 7.0/7.1)
 3. Enable **Listen for PHP Debug Connections** (phone icon in toolbar)
 4. Configure **path mappings**:
    - Local path: `/your/local/workspace/projects/project1`
@@ -454,8 +450,8 @@ Meilisearch dashboard is available at [http://meilisearch.test](http://meilisear
 You do not need to start all 10 PHP containers. Start only what you need:
 
 ```bash
-# Start core services + only PHP 8.2 and 5.6
-docker compose up -d traefik nginx mariadb redis meilisearch mailhog php82 php56
+# Start core services + only PHP 8.2
+docker compose up -d traefik nginx mariadb redis meilisearch mailhog php82
 ```
 
 ---
@@ -574,7 +570,6 @@ All modern PHP containers (7.2+) include:
 
 `bcmath` `exif` `gd` `intl` `mbstring` `opcache` `pdo` `pdo_mysql` `pcntl` `sockets` `zip` `redis` `imagick` `xdebug`
 
-PHP 5.6 additionally includes: `mcrypt`
 
 PHP 7.0 does not include `imagick` (compatibility).
 

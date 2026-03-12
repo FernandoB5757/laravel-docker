@@ -264,6 +264,6 @@ ENVEOF
         echo "  logs [service]                  Tail service logs"
         echo "  status                          Show container status"
         echo ""
-        echo "PHP Containers: php83 php82 php81 php80 php74 php73 php72 php71 php70 php56"
+        echo "PHP Containers: php83 php82 php81 php80 php74 php73 php72 php71 php70"
         ;;
 esac
