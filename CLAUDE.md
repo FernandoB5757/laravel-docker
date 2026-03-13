@@ -106,11 +106,11 @@ Three Dockerfiles, selected by `docker-compose.yml` based on version:
 ### Key Files
 
 - `docker-compose.yml` — all services; uses YAML anchors (`x-php-common`, `x-php-env`, `x-php-volumes-v3/v2`) to avoid per-container repetition
-- `.env` (from `.env.example`) — root-level env vars for the platform (DB credentials, Xdebug mode, ports)
+- `.env` (from `.env.example`) — root-level env vars for the platform (DB credentials, Xdebug mode, ports, host user mapping (WWWUSER/WWWGROUP))
 - `docker/php/conf/php.ini` — shared PHP settings applied to all versions
 - `docker/php/conf/xdebug-v3.ini` / `xdebug-v2.ini` — Xdebug config, version-split
 - `docker/php/conf/www.conf` — PHP-FPM pool config (shared across all containers)
-- `docker/php/entrypoint.sh` — runs on container start: copies SSH keys, sets git safe.directory, fixes Laravel storage permissions
+- `docker/php/entrypoint.sh` — runs on container start: remaps www-data UID/GID to host developer user (WWWUSER/WWWGROUP), copies SSH keys, sets git safe.directory, creates storage directories if missing
 - `docker/nginx/conf.d/` — one `.conf` per project; `_template.conf.example` is the source for new vhosts; `upstreams.conf` defines all PHP upstream blocks
 - `docker/nginx/conf.d/_template.conf.example` — template with `PROJECTNAME` / `PHPVERSION` placeholders
 - `docker/mariadb/initdb.d/01-create-databases.sql` — runs on first MariaDB start to pre-create databases

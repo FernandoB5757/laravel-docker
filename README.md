@@ -557,6 +557,30 @@ DB_PORT=33060
 REDIS_PORT=63790
 ```
 
+### Storage / bootstrap/cache permission errors in Laravel
+
+This should not happen with a correct setup — PHP-FPM runs as your host user (`WWWUSER`) so it owns the files directly. If you see permission errors, the most likely cause is that `WWWUSER`/`WWWGROUP` in `.env` do not match your actual UID/GID.
+
+Verify your UID:
+```bash
+id -u && id -g
+```
+
+Then update `.env` and restart:
+```bash
+# In .env
+WWWUSER=1000   # replace with your actual UID
+WWWGROUP=1000  # replace with your actual GID
+
+docker compose up -d
+```
+
+If you need an immediate fix without restarting:
+```bash
+# From the host — no container exec needed
+chmod -R 775 projects/myapp/storage projects/myapp/bootstrap/cache
+```
+
 ---
 
 ## PHP Extension Summary

@@ -188,9 +188,11 @@ docker exec mariadb mysqldump -ularavel -psecret myapp > backup-myapp.sql
 | Laravel can't connect to DB | `SQLSTATE[HY000]` | In `.env` set `DB_HOST=mariadb` (not `localhost`) |
 | Redis connection refused | `Connection refused 127.0.0.1:6379` | In `.env` set `REDIS_HOST=redis` (not `localhost`) |
 | Composer memory error | `Fatal error: memory exhausted` | `php -d memory_limit=-1 /usr/bin/composer install` |
-| Composer permission denied | `Permission denied on vendor/` | `docker exec -it php82 bash -c "chown -R www-data:www-data /var/www/myproject/vendor"` |
+| Composer permission denied | `Permission denied on vendor/` | `docker exec -it php82 bash -c "chown -R $(id -u):$(id -g) /var/www/myproject/vendor"` |
 | `*.test` not resolving | Browser: "This site can't be reached" | `sudo systemctl restart dnsmasq` then `ping project.test` |
 | Nginx won't reload | Config error after editing vhost | `docker exec nginx nginx -t` (shows exact error line) |
+
+> **Note:** PHP-FPM runs as your host user (`WWWUSER`). Files created inside containers are owned by you on the host — `chown www-data` is no longer the correct fix.
 
 ---
 

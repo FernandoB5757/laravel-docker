@@ -335,10 +335,7 @@ php artisan db:seed
 # 4. Create the storage symlink
 php artisan storage:link
 
-# 5. Set correct folder permissions
-chmod -R 775 storage bootstrap/cache
-
-# 6. Clear all caches
+# 5. Clear all caches
 php artisan optimize:clear
 ```
 
@@ -508,14 +505,24 @@ Configure your IDE to listen on port **9000** (not 9003).
 
 ### Storage / bootstrap/cache permission errors in Laravel
 
-If Laravel throws a `Permission denied` error writing to `storage/` or `bootstrap/cache/`, the entrypoint script sets permissions automatically on startup. If permissions are still wrong:
+This should not happen with a correct setup — PHP-FPM runs as your host user (`WWWUSER`) so it owns the files directly. If you see permission errors, the most likely cause is that `WWWUSER`/`WWWGROUP` in `.env` do not match your actual UID/GID.
 
+Verify your UID:
 ```bash
-# Fix manually inside the container
-docker exec -it php82 bash -c "chmod -R 775 /var/www/myapp/storage /var/www/myapp/bootstrap/cache"
+id -u && id -g
 ```
 
-Or from the host:
+Then update `.env` and restart:
 ```bash
+# In .env
+WWWUSER=1000   # replace with your actual UID
+WWWGROUP=1000  # replace with your actual GID
+
+docker compose up -d
+```
+
+If you need an immediate fix without restarting:
+```bash
+# From the host — no container exec needed
 chmod -R 775 projects/myapp/storage projects/myapp/bootstrap/cache
 ```
