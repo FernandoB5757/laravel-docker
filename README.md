@@ -52,49 +52,46 @@ Node.js is **not** containerized — manage it locally via [NVM](https://github.
 
 ```
 workspace/
-├── .env                        # Root environment variables
+├── .env                        # Root environment variables (copy from .env.example)
 ├── docker-compose.yml          # Main service definitions
 │
 ├── docker/
 │   ├── nginx/
 │   │   ├── nginx.conf          # Main Nginx config
 │   │   └── conf.d/
-│   │       ├── upstreams.conf  # PHP-FPM upstream pool definitions
-│   │       ├── project1.conf   # project1.test → PHP 8.2
-│   │       └── _template.conf.example  # Template for new projects
+│   │       ├── upstreams.conf          # PHP-FPM upstream pool definitions
+│   │       ├── _template.conf.example  # Template for new project vhosts
+│   │       └── myapp.conf              # One file per project (you create these)
 │   │
 │   ├── php/
-│   │   ├── php83/              # PHP 8.3 FPM container
-│   │   │   ├── Dockerfile
-│   │   │   ├── php.ini
-│   │   │   ├── xdebug.ini
-│   │   │   └── www.conf
-│   │   ├── php82/              # PHP 8.2 FPM container
-│   │   ├── php81/              # PHP 8.1 FPM container
-│   │   ├── php80/              # PHP 8.0 FPM container
-│   │   ├── php74/              # PHP 7.4 FPM container
-│   │   ├── php73/              # PHP 7.3 FPM container
-│   │   ├── php72/              # PHP 7.2 FPM container
-│   │   ├── php71/              # PHP 7.1 FPM container
-│   │   └── php70/              # PHP 7.0 FPM container
+│   │   ├── Dockerfile.8x       # PHP 8.0, 8.1, 8.2, 8.3 — Alpine + Xdebug 3.x
+│   │   ├── Dockerfile.7x       # PHP 7.2, 7.3, 7.4 — Alpine + Xdebug 3.x
+│   │   ├── Dockerfile.legacy   # PHP 7.0, 7.1 — Alpine + Xdebug 2.x
+│   │   ├── entrypoint.sh       # Startup: SSH keys, git safe.directory, permissions
+│   │   └── conf/
+│   │       ├── php.ini         # Shared PHP settings (all versions)
+│   │       ├── www.conf        # PHP-FPM pool config (all versions)
+│   │       ├── xdebug-v3.ini   # Xdebug 3.x config (PHP 7.2+) — uses XDEBUG_MODE
+│   │       └── xdebug-v2.ini   # Xdebug 2.x config (PHP 7.0/7.1) — edit directly
 │   │
 │   ├── mariadb/
 │   │   ├── conf.d/my.cnf       # MariaDB tuning config
-│   │   └── initdb.d/           # SQL scripts run on first init
+│   │   ├── initdb.d/           # SQL scripts run on first MariaDB init
+│   │   └── dumps/              # Place .sql files here for db-import
 │   │
 │   ├── redis/
 │   │   └── redis.conf          # Redis config
 │   │
 │   └── traefik/
-│       ├── dynamic/config.yml  # Traefik dynamic config (TLS, middleware)
+│       ├── dynamic/config.yml  # Traefik dynamic config (TLS, middleware, routes)
 │       └── certs/              # SSL certificate storage
 │
 ├── projects/                   # Your Laravel projects live here
-│   └── project1/               # project1.test (PHP 8.2)
+│   └── myapp/                  # myapp.test → whichever PHP version you configure
 │
 └── scripts/
     ├── dev.sh                  # Developer helper CLI
-    └── setup-dns.sh            # One-time DNS setup script
+    └── setup-dns.sh            # One-time DNS setup script (Ubuntu)
 ```
 
 ---
@@ -139,7 +136,7 @@ ping project1.test    # Should reply from 127.0.0.1
 ### 4. Configure environment variables
 
 ```bash
-cp docker/.env.example .env
+cp .env.example .env
 # Edit .env if needed (database passwords, ports, etc.)
 ```
 
@@ -240,7 +237,7 @@ This creates:
 
 Then:
 1. Place your Laravel app in `projects/myapp/`
-2. Add `myapp` database to `docker/mariadb/initdb.d/01-create-databases.sql`
+2. Create the database: `./scripts/dev.sh db-create myapp`
 3. Reload Nginx: `docker exec nginx nginx -s reload`
 4. Open [http://myapp.test](http://myapp.test)
 
@@ -265,21 +262,16 @@ server {
 }
 ```
 
-**2. Add the database** in `docker/mariadb/initdb.d/01-create-databases.sql`:
-
-```sql
-CREATE DATABASE IF NOT EXISTS `myapp` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-GRANT ALL PRIVILEGES ON `myapp`.* TO 'laravel'@'%';
-FLUSH PRIVILEGES;
-```
-
-If MariaDB is already running, execute directly:
+**2. Create the database:**
 
 ```bash
-docker exec -it mariadb mysql -uroot -psecret -e \
-  "CREATE DATABASE IF NOT EXISTS myapp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; \
-   GRANT ALL PRIVILEGES ON myapp.* TO 'laravel'@'%'; \
-   FLUSH PRIVILEGES;"
+./scripts/dev.sh db-create myapp
+```
+
+Or to import from a dump (place the file in `docker/mariadb/dumps/` first):
+
+```bash
+./scripts/dev.sh db-import myapp dump.sql
 ```
 
 **3. Reload Nginx** (no restart needed):
@@ -304,23 +296,24 @@ MEILISEARCH_HOST=http://meilisearch:7700
 
 ## Service Reference
 
-| Service        | Container     | Internal Host  | Exposed Port    | URL                          |
-|---------------|---------------|----------------|-----------------|------------------------------|
-| Traefik        | `traefik`     | `traefik`      | 80, 443, 8080   | http://traefik.test          |
-| Nginx          | `nginx`       | `nginx`        | (via Traefik)   | http://project1.test         |
-| PHP 8.3        | `php83`       | `php83`        | 9000 (internal) | -                            |
-| PHP 8.2        | `php82`       | `php82`        | 9000 (internal) | -                            |
-| PHP 8.1        | `php81`       | `php81`        | 9000 (internal) | -                            |
-| PHP 8.0        | `php80`       | `php80`        | 9000 (internal) | -                            |
-| PHP 7.4        | `php74`       | `php74`        | 9000 (internal) | -                            |
-| PHP 7.3        | `php73`       | `php73`        | 9000 (internal) | -                            |
-| PHP 7.2        | `php72`       | `php72`        | 9000 (internal) | -                            |
-| PHP 7.1        | `php71`       | `php71`        | 9000 (internal) | -                            |
-| PHP 7.0        | `php70`       | `php70`        | 9000 (internal) | -                            |
-| MariaDB        | `mariadb`     | `mariadb`      | 3306            | (DB client: localhost:3306)  |
+| Service        | Container     | Internal Host  | Exposed Port    | URL                           |
+|---------------|---------------|----------------|-----------------|-------------------------------|
+| Traefik        | `traefik`     | `traefik`      | 80, 8080        | http://traefik.test           |
+| Nginx          | `nginx`       | `nginx`        | (via Traefik)   | http://myapp.test             |
+| PHP 8.3        | `php83`       | `php83`        | 9000 (internal) | -                             |
+| PHP 8.2        | `php82`       | `php82`        | 9000 (internal) | -                             |
+| PHP 8.1        | `php81`       | `php81`        | 9000 (internal) | -                             |
+| PHP 8.0        | `php80`       | `php80`        | 9000 (internal) | -                             |
+| PHP 7.4        | `php74`       | `php74`        | 9000 (internal) | -                             |
+| PHP 7.3        | `php73`       | `php73`        | 9000 (internal) | -                             |
+| PHP 7.2        | `php72`       | `php72`        | 9000 (internal) | -                             |
+| PHP 7.1        | `php71`       | `php71`        | 9000 (internal) | -                             |
+| PHP 7.0        | `php70`       | `php70`        | 9000 (internal) | -                             |
+| MariaDB        | `mariadb`     | `mariadb`      | 3306            | (DB client: localhost:3306)   |
 | Redis          | `redis`       | `redis`        | 6379            | (Redis client: localhost:6379)|
-| Meilisearch    | `meilisearch` | `meilisearch`  | 7700            | http://meilisearch.test      |
-| Mailhog        | `mailhog`     | `mailhog`      | 1025, 8025      | http://mail.test             |
+| Meilisearch    | `meilisearch` | `meilisearch`  | 7700            | http://meilisearch.test       |
+| Mailhog        | `mailhog`     | `mailhog`      | 1025, 8025      | http://mail.test              |
+| phpMyAdmin     | `phpmyadmin`  | `phpmyadmin`   | (via Traefik)   | http://pma.test               |
 
 ---
 
@@ -348,11 +341,13 @@ docker compose up -d
 ### IDE Setup (PhpStorm)
 
 1. Go to **Settings → PHP → Debug**
-2. Set **Debug port** to `9003` (Xdebug 3.x) or `9000` (PHP 7.0/7.1)
+2. Set **Debug port** to `9003` (PHP 7.2+ / Xdebug 3.x) or `9000` (PHP 7.0/7.1 / Xdebug 2.x)
 3. Enable **Listen for PHP Debug Connections** (phone icon in toolbar)
 4. Configure **path mappings**:
-   - Local path: `/your/local/workspace/projects/project1`
-   - Remote path: `/var/www/project1`
+   - Local path: `/your/local/workspace/projects/myapp`
+   - Remote path: `/var/www/myapp`
+
+> **PHP 7.0 / 7.1 note:** `XDEBUG_MODE` has no effect on Xdebug 2.x. To enable debugging, edit `docker/php/conf/xdebug-v2.ini` directly and set `xdebug.remote_enable = 1`, then restart the container.
 
 ### Xdebug Modes
 
@@ -579,10 +574,12 @@ PHP 7.0 does not include `imagick` (compatibility).
 
 ### Add a new PHP version
 
-1. Create `docker/php/phpXX/` directory with `Dockerfile`, `php.ini`, `xdebug.ini`, `www.conf`
-2. Add the service to `docker-compose.yml` following the existing pattern
+1. Add the service to `docker-compose.yml` following the existing pattern, pointing `dockerfile` to `Dockerfile.8x`, `Dockerfile.7x`, or `Dockerfile.legacy` as appropriate
+2. Assign a static IP in the `172.20.0.0/16` subnet
 3. Add the upstream to `docker/nginx/conf.d/upstreams.conf`
-4. Rebuild: `docker compose build phpXX`
+4. Build: `docker compose build phpXX && docker compose up -d phpXX`
+
+Shared config (`docker/php/conf/`) is bind-mounted into every container — no changes to the Dockerfiles needed for PHP/FPM settings.
 
 ### Add a new service (e.g. PostgreSQL)
 
