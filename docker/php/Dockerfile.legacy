@@ -32,6 +32,7 @@ RUN apk add --no-cache --virtual .build-deps \
         mariadb-client \
         openssh-client \
         openssl-dev \
+        shadow \
         unzip \
         zip \
         zlib-dev

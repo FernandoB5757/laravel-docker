@@ -33,6 +33,8 @@ x-php-common: &php-common
 x-php-env: &php-env
   XDEBUG_MODE: ${XDEBUG_MODE:-off}
   XDEBUG_CLIENT_HOST: ${XDEBUG_CLIENT_HOST:-host-gateway}
+  WWWUSER: ${WWWUSER:-1000}
+  WWWGROUP: ${WWWGROUP:-1000}
 
 x-php-volumes-v3: &php-volumes-v3
   - ./projects:/var/www

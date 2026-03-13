@@ -34,6 +34,7 @@ RUN apk add --no-cache --virtual .build-deps \
         oniguruma-dev \
         openssh-client \
         openssl-dev \
+        shadow \
         unzip \
         zip \
         zlib-dev
@@ -44,7 +45,8 @@ RUN docker-php-ext-configure gd \
         --with-jpeg \
         --with-webp \
     && docker-php-ext-install -j$(nproc) \
-        bcmath exif gd intl mbstring opcache pdo pdo_mysql pcntl sockets zip
+        bcmath exif gd intl mbstring opcache pdo pdo_mysql pcntl sockets zip  \
+        ftp
 
 # PECL extensions
 RUN pecl install redis   && docker-php-ext-enable redis

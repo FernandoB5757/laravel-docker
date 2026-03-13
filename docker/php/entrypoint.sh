@@ -34,14 +34,44 @@ chmod 644 /root/.ssh/known_hosts 2>/dev/null || true
 git config --global --add safe.directory '*'
 
 # ---------------------------------------------------------------------------
-# Laravel storage/cache permissions
-# php-fpm runs as www-data (uid 82); files on the host are owned by uid 1000.
-# www-data is not in group 1000, so 775 only gives it r-x (no write).
-# We use 777 on these two directories so www-data can write regardless of owner.
+# UID/GID remapping (Laravel Sail strategy)
+#
+# PHP-FPM runs as www-data. Files on the host are owned by the developer
+# (typically uid/gid 1000). Instead of chmod-ing everything (which pollutes
+# git's tracked file modes), we remap www-data to match the host developer's
+# uid/gid so the process owns the files naturally.
+#
+# WWWUSER and WWWGROUP are injected via docker-compose environment and
+# written to .env by scripts/setup-dns.sh on first-time setup.
+# ---------------------------------------------------------------------------
+WWWUSER=${WWWUSER:-1000}
+WWWGROUP=${WWWGROUP:-1000}
+
+CURRENT_GID=$(id -g www-data)
+CURRENT_UID=$(id -u www-data)
+
+if [ "$CURRENT_GID" != "$WWWGROUP" ]; then
+    groupmod -g "$WWWGROUP" www-data
+fi
+if [ "$CURRENT_UID" != "$WWWUSER" ]; then
+    usermod -u "$WWWUSER" www-data
+fi
+
+# ---------------------------------------------------------------------------
+# Laravel storage structure
+# Ensure all required directories exist for every project.
+# No chmod needed — www-data is now remapped to the host uid/gid and
+# therefore already owns every file under /var/www.
 # ---------------------------------------------------------------------------
 for project in /var/www/*/; do
-    [ -d "${project}storage" ]         && chmod -R 777 "${project}storage"
-    [ -d "${project}bootstrap/cache" ] && chmod -R 777 "${project}bootstrap/cache"
+    mkdir -p \
+        "${project}storage/app/public" \
+        "${project}storage/framework/cache/data" \
+        "${project}storage/framework/sessions" \
+        "${project}storage/framework/testing" \
+        "${project}storage/framework/views" \
+        "${project}storage/logs" \
+        "${project}bootstrap/cache"
 done
 
 exec "$@"

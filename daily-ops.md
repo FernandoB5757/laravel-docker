@@ -182,6 +182,7 @@ docker exec mariadb mysqldump -ularavel -psecret myapp > backup-myapp.sql
 
 | Problem | Symptom | Fix |
 |---|---|---|
+| Laravel storage permission denied | `file_put_contents: Failed to open stream: Permission denied` | `chmod -R 777 projects/YOURPROJECT/storage projects/YOURPROJECT/bootstrap/cache` or `docker compose restart PHP_VERSION` |
 | Nginx shows 404 | White page or nginx 404 | Check vhost: `root /var/www/YOURPROJECT/public;` — must point to `/public` |
 | Nginx 502 Bad Gateway | 502 in browser | PHP container is down. Run: `docker compose up -d php82` |
 | Laravel can't connect to DB | `SQLSTATE[HY000]` | In `.env` set `DB_HOST=mariadb` (not `localhost`) |

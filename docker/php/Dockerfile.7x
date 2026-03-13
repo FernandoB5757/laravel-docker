@@ -39,6 +39,7 @@ RUN apk add --no-cache --virtual .build-deps \
         oniguruma-dev \
         openssh-client \
         openssl-dev \
+        shadow \
         unzip \
         zip \
         zlib-dev
