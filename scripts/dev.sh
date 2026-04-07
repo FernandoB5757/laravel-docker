@@ -59,12 +59,22 @@ case "$1" in
     shell)
         PHP_CONTAINER="${2:-php82}"
         PROJECT="${3:-}"
-        echo "Opening shell in ${PHP_CONTAINER}..."
+        echo "Opening shell in ${PHP_CONTAINER} (as www-data)..."
         if [ -n "$PROJECT" ]; then
-            docker exec -it "$PHP_CONTAINER" bash -c "cd /var/www/$PROJECT && exec bash"
+            docker exec -it -u www-data "$PHP_CONTAINER" bash -c "cd /var/www/$PROJECT && exec bash"
         else
-            docker exec -it "$PHP_CONTAINER" bash
+            docker exec -it -u www-data "$PHP_CONTAINER" bash
         fi
+        ;;
+
+    # -------------------------------------------------------
+    # Root shell into a PHP container (for system operations)
+    # Usage: ./dev.sh root-shell php82
+    # -------------------------------------------------------
+    root-shell)
+        PHP_CONTAINER="${2:-php82}"
+        echo "Opening ROOT shell in ${PHP_CONTAINER}..."
+        docker exec -it "$PHP_CONTAINER" bash
         ;;
 
     # -------------------------------------------------------
@@ -76,7 +86,7 @@ case "$1" in
         PROJECT="${3:?Usage: artisan <container> <project> <command>}"
         shift 3
         echo "Running: php artisan $@ in $PROJECT via $PHP_CONTAINER"
-        docker exec -it "$PHP_CONTAINER" bash -c "cd /var/www/$PROJECT && php artisan $*"
+        docker exec -it -u www-data "$PHP_CONTAINER" bash -c "cd /var/www/$PROJECT && php artisan $*"
         ;;
 
     # -------------------------------------------------------
@@ -88,7 +98,7 @@ case "$1" in
         PROJECT="${3:?Usage: composer <container> <project> <command>}"
         shift 3
         echo "Running: composer $@ in $PROJECT via $PHP_CONTAINER"
-        docker exec -it "$PHP_CONTAINER" bash -c "cd /var/www/$PROJECT && composer $*"
+        docker exec -it -u www-data "$PHP_CONTAINER" bash -c "cd /var/www/$PROJECT && composer $*"
         ;;
 
     # -------------------------------------------------------
@@ -282,7 +292,8 @@ ENVEOF
         echo "Commands:"
         echo "  up                              Start all services"
         echo "  down                            Stop all services"
-        echo "  shell <container> [project]     Open bash shell"
+        echo "  shell <container> [project]     Open bash shell (as www-data)"
+        echo "  root-shell <container>          Open root bash shell"
         echo "  artisan <container> <project> <cmd>   Run php artisan"
         echo "  composer <container> <project> <cmd>  Run composer"
         echo "  xdebug-on                       Enable Xdebug (PHP 7.2+ only)"

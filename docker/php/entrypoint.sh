@@ -72,6 +72,12 @@ for project in /var/www/*/; do
         "${project}storage/framework/views" \
         "${project}storage/logs" \
         "${project}bootstrap/cache"
+
+    # Fix any root-owned files in storage AND bootstrap/cache
+    # (e.g. from docker exec as root running artisan/composer)
+    find "${project}storage" "${project}bootstrap/cache" \
+        \( -not -user "$WWWUSER" -o -not -group "$WWWGROUP" \) \
+        -exec chown www-data:www-data {} + 2>/dev/null || true
 done
 
 exec "$@"
