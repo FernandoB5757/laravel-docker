@@ -24,6 +24,7 @@ RUN apk add --no-cache --virtual .build-deps \
         git \
         icu-dev \
         imagemagick-dev \
+        libgomp \
         jpeg-dev \
         libjpeg-turbo-dev \
         libpng-dev \

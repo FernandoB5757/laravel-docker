@@ -56,14 +56,12 @@ services:
   # TRAEFIK — Reverse Proxy + Automatic *.test Domain Routing
   ###############################################################################
   traefik:
-    image: traefik:v3.0
+    image: traefik:v3.4
     container_name: traefik
     restart: unless-stopped
     command:
       - "--api.insecure=true"
       - "--api.dashboard=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
@@ -72,7 +70,6 @@ services:
       - "80:80"
       - "8080:8080"   # Traefik dashboard → http://traefik.test
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./docker/traefik/dynamic:/etc/traefik/dynamic:ro"
       - "./docker/traefik/certs:/certs:ro"
     networks:
@@ -91,6 +88,10 @@ services:
     image: nginx:1.25-alpine
     container_name: nginx
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 8192
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
