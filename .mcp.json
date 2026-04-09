@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "mariadb": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "--network", "laravel-docker_laravel_network",
+        "-e", "DB_HOST=mariadb",
+        "-e", "DB_PORT=3306",
+        "-e", "DB_USER=mcp_readonly",
+        "-e", "DB_PASSWORD=mcp_readonly",
+        "-e", "MCP_READ_ONLY=true",
+        "mariadb-mcp"
+      ]
+    }
+  }
+}

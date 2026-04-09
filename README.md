@@ -67,7 +67,7 @@ workspace/
 │   │   ├── Dockerfile.8x       # PHP 8.0, 8.1, 8.2, 8.3 — Alpine + Xdebug 3.x
 │   │   ├── Dockerfile.7x       # PHP 7.2, 7.3, 7.4 — Alpine + Xdebug 3.x
 │   │   ├── Dockerfile.legacy   # PHP 7.0, 7.1 — Alpine + Xdebug 2.x
-│   │   ├── entrypoint.sh       # Startup: SSH keys, git safe.directory, permissions
+│   │   ├── entrypoint.sh       # Startup: SSH keys, git safe.directory, Laravel storage dirs
 │   │   └── conf/
 │   │       ├── php.ini         # Shared PHP settings (all versions)
 │   │       ├── www.conf        # PHP-FPM pool config (all versions)
@@ -78,6 +78,9 @@ workspace/
 │   │   ├── conf.d/my.cnf       # MariaDB tuning config
 │   │   ├── initdb.d/           # SQL scripts run on first MariaDB init
 │   │   └── dumps/              # Place .sql files here for db-import
+│   │
+│   ├── mariadb-mcp/
+│   │   └── Dockerfile          # MariaDB MCP server image for Claude Code
 │   │
 │   ├── redis/
 │   │   └── redis.conf          # Redis config
@@ -174,12 +177,35 @@ docker compose down
 
 ### Shell Access
 
+PHP containers default to the **`www-data`** user (remapped to your host UID at build time), so any files you create from inside the container are owned by your host developer — no sudo in the editor, no root-owned migrations.
+
 ```bash
-# Open bash in a specific PHP container
+# Open bash as www-data (the default)
 docker exec -it php82 bash
 
-# Or with the helper — opens in your project directory
+# Or with the helper — cd's into your project and uses www-data
 ./scripts/dev.sh shell php82 project1
+```
+
+#### Accessing the container as root
+
+Use root only for system tasks (installing packages, debugging permissions). Artisan, composer and any file creation should **always** run as `www-data`, otherwise new files land owned by `root` and VSCode will ask for sudo to save them.
+
+```bash
+# Preferred — use the helper
+./scripts/dev.sh root-shell php82
+
+# Equivalent raw docker command
+docker exec -it -u root php82 bash
+
+# One-shot root command without a shell
+docker exec -u root php82 apk add --no-cache some-package
+```
+
+If you accidentally create a root-owned file, fix it with:
+
+```bash
+docker exec -u root php82 chown www-data:www-data /var/www/<project>/path/to/file
 ```
 
 ### Running Artisan
@@ -379,6 +405,96 @@ Root access:
 User:     root
 Password: secret
 ```
+
+---
+
+## MariaDB MCP Server (Claude Code Integration)
+
+The stack ships with a containerized [MariaDB MCP server](https://github.com/mariadb/mcp) that lets [Claude Code](https://claude.com/claude-code) query your project databases directly — inspect schemas, run `SELECT`s, explore data — without leaving the terminal.
+
+### How it works
+
+- **Dockerfile** at `docker/mariadb-mcp/Dockerfile` builds an image from the upstream MariaDB MCP repo
+- **`.mcp.json`** at the project root tells Claude Code to spawn the MCP as an ephemeral `docker run -i --rm` container on the shared `laravel_network`, communicating over stdio
+- A dedicated **`mcp_readonly`** MariaDB user (created automatically in `docker/mariadb/initdb.d/01-create-databases.sql`) enforces read-only access at the database level — the MCP can only `SELECT` and `SHOW DATABASES`
+- `MCP_READ_ONLY=true` is also set in `.mcp.json` as a second safety layer
+
+### First-time setup
+
+```bash
+# 1. Build the MCP image (only needed once, or to update)
+docker build -t mariadb-mcp docker/mariadb-mcp/
+
+# 2. If MariaDB is already running from before this feature was added,
+#    create the read-only user manually (fresh installs get it automatically):
+docker exec mariadb mysql -uroot -psecret -e "
+  CREATE USER IF NOT EXISTS 'mcp_readonly'@'%' IDENTIFIED BY 'mcp_readonly';
+  GRANT SELECT, SHOW DATABASES ON *.* TO 'mcp_readonly'@'%';
+  FLUSH PRIVILEGES;
+"
+
+# 3. Restart Claude Code (or run /mcp) so it picks up .mcp.json
+```
+
+### How to use it
+
+Once Claude Code is restarted and the MCP shows up under `/mcp`, you can ask natural-language questions and Claude will translate them into SQL, run them via the MCP, and summarize the results. You don't need to write SQL yourself.
+
+**Exploring a database you don't know:**
+
+> "What databases exist?"
+> "What tables are in `myapp`?"
+> "Describe the `users` table in `myapp`."
+> "What foreign keys does `myapp.orders` have?"
+
+**Inspecting data:**
+
+> "How many rows are in `myapp.users`?"
+> "What are the distinct values in the `status` column of `myapp.orders`?"
+> "Show me the 10 most recent orders from `myapp`."
+> "Find all users whose email ends in `@example.com`."
+
+**Schema / migration state:**
+
+> "Has the `2024_06_add_status_to_orders` migration run on `myapp`?"
+> "Compare the columns of `posts` between `myapp` and `myapp_staging`."
+> "Which tables in `myapp` don't have an index on `created_at`?"
+
+**Cross-database questions:**
+
+> "List every database on this MariaDB instance with its table count."
+> "Which project databases have a `users` table?"
+
+**Debugging:**
+
+> "The user with id 42 in `myapp` — what's their full row?"
+> "Why is `myapp.jobs` growing? Show me the oldest 5 rows and their `attempts` count."
+
+**What you can't do:**
+
+The MCP user is strictly read-only (`SELECT` and `SHOW DATABASES` only). If you ask Claude to insert, update, delete, drop, or alter anything, it will refuse or the query will fail. For writes, use `./scripts/dev.sh shell` or a Laravel migration.
+
+**Under the hood:**
+
+Claude Code spawns a fresh MCP container per session (~3s startup), connects to the `mariadb` container by name over `laravel_network`, and tears it down when the session ends. Queries run as the `mcp_readonly` user, enforced both at the database level (grants) and at the MCP level (`MCP_READ_ONLY=true`).
+
+### Claude Code skill
+
+The project also ships a Claude Code skill at `.claude/skills/mariadb-mcp/SKILL.md` that teaches Claude when to reach for the MCP, safe query patterns, and how to report results. The skill is loaded automatically by Claude Code when working in this repo — no manual activation needed.
+
+### Rebuilding to update the MCP
+
+The Dockerfile clones the upstream repo at build time, so rebuild to pick up upstream changes:
+
+```bash
+docker build --no-cache -t mariadb-mcp docker/mariadb-mcp/
+```
+
+### Security notes
+
+- The `mcp_readonly` user is intentionally weak (`SELECT` only, wildcard host) for local-dev convenience. **Do not** reuse this Dockerfile or credentials outside of local development.
+- `.mcp.json` is committed so the setup is reproducible across machines. If you add sensitive env vars, put them in `.env` and reference them instead.
+- The MCP container runs ephemerally (`--rm`) — nothing persists between sessions.
 
 ---
 

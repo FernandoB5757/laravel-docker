@@ -15,4 +15,8 @@
 -- Grant wildcard for new databases matching pattern
 -- GRANT ALL PRIVILEGES ON `laravel_%`.* TO 'laravel'@'%';
 
+-- Read-only user for MariaDB MCP server (used by Claude Code)
+CREATE USER IF NOT EXISTS 'mcp_readonly'@'%' IDENTIFIED BY 'mcp_readonly';
+GRANT SELECT, SHOW DATABASES ON *.* TO 'mcp_readonly'@'%';
+
 FLUSH PRIVILEGES;
