@@ -70,11 +70,13 @@ case "$1" in
     # -------------------------------------------------------
     # Root shell into a PHP container (for system operations)
     # Usage: ./dev.sh root-shell php82
+    # The image defaults to www-data, so we must pass -u root
+    # explicitly to land as root.
     # -------------------------------------------------------
     root-shell)
         PHP_CONTAINER="${2:-php82}"
         echo "Opening ROOT shell in ${PHP_CONTAINER}..."
-        docker exec -it "$PHP_CONTAINER" bash
+        docker exec -it -u root "$PHP_CONTAINER" bash
         ;;
 
     # -------------------------------------------------------

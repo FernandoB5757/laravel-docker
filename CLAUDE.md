@@ -19,9 +19,13 @@ All commands run from the workspace root (`/home/fernando/docker/laravel-docker`
 ./scripts/dev.sh status
 ./scripts/dev.sh logs [service]
 
-# Shell into a PHP container
+# Shell into a PHP container (as www-data — the container default)
 ./scripts/dev.sh shell php82
 ./scripts/dev.sh shell php82 myapp    # drops into /var/www/myapp
+
+# Root shell — only for system tasks (apk add, chown, etc.)
+./scripts/dev.sh root-shell php82
+docker exec -it -u root php82 bash    # equivalent raw form
 
 # Run artisan / composer
 ./scripts/dev.sh artisan php82 myapp migrate
@@ -103,6 +107,16 @@ Three Dockerfiles, selected by `docker-compose.yml` based on version:
 | `http://pma.test` | phpMyAdmin |
 | `http://meilisearch.test` | Meilisearch |
 
+### MariaDB MCP Server
+
+Claude Code can query the project databases directly via a containerized [MariaDB MCP server](https://github.com/mariadb/mcp). Setup is fully version-controlled:
+
+- `docker/mariadb-mcp/Dockerfile` — builds the MCP image from the upstream repo
+- `.mcp.json` — tells Claude Code to spawn the MCP as `docker run -i --rm` on `laravel-docker_laravel_network`, communicating over stdio
+- `mcp_readonly` MariaDB user (created in `docker/mariadb/initdb.d/01-create-databases.sql`) enforces read-only access at the DB level; `MCP_READ_ONLY=true` in `.mcp.json` is a second safety layer
+
+Build the image once with `docker build -t mariadb-mcp docker/mariadb-mcp/`. The MCP connects to the `mariadb` container by name over the shared Docker network — no host port needed. See README.md "MariaDB MCP Server" section for details.
+
 ### Key Files
 
 - `docker-compose.yml` — all services; uses YAML anchors (`x-php-common`, `x-php-env`, `x-php-volumes-v3/v2`) to avoid per-container repetition
@@ -110,7 +124,8 @@ Three Dockerfiles, selected by `docker-compose.yml` based on version:
 - `docker/php/conf/php.ini` — shared PHP settings applied to all versions
 - `docker/php/conf/xdebug-v3.ini` / `xdebug-v2.ini` — Xdebug config, version-split
 - `docker/php/conf/www.conf` — PHP-FPM pool config (shared across all containers)
-- `docker/php/entrypoint.sh` — runs on container start: remaps www-data UID/GID to host developer user (WWWUSER/WWWGROUP), copies SSH keys, sets git safe.directory, creates storage directories if missing
+- `docker/php/Dockerfile.{8x,7x,legacy}` — bake host developer UID/GID into `www-data` at build time via `WWWUSER`/`WWWGROUP` build args, and set `USER www-data` so plain `docker exec -it <container> bash` defaults to that user (prevents root-owned files leaking onto the host). Root access requires explicit `-u root` or `./scripts/dev.sh root-shell`.
+- `docker/php/entrypoint.sh` — runs on container start as `www-data`: copies SSH keys into `$HOME/.ssh`, sets `git safe.directory '*'`, creates Laravel storage directories if missing. UID remapping is no longer done here — it's baked at build time by the Dockerfiles.
 - `docker/nginx/conf.d/` — one `.conf` per project; `_template.conf.example` is the source for new vhosts; `upstreams.conf` defines all PHP upstream blocks
 - `docker/nginx/conf.d/_template.conf.example` — template with `PROJECTNAME` / `PHPVERSION` placeholders
 - `docker/mariadb/initdb.d/01-create-databases.sql` — runs on first MariaDB start to pre-create databases

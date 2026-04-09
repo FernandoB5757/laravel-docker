@@ -67,7 +67,32 @@ COPY conf/www.conf   /usr/local/etc/php-fpm.d/www.conf
 COPY entrypoint.sh   /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# ------------------------------------------------------------
+# Bake host developer uid/gid into www-data at build time, so
+# plain `docker exec -it <container> bash` defaults to that
+# user and files created from inside are owned by the host
+# developer (no sudo in the editor, no root-owned migrations).
+# Root access is still available via `docker exec -u root`
+# or `./scripts/dev.sh root-shell`.
+# ------------------------------------------------------------
+ARG WWWUSER=1000
+ARG WWWGROUP=1000
+RUN set -e; \
+    if [ "$(id -g www-data)" != "${WWWGROUP}" ]; then \
+        groupmod -g ${WWWGROUP} www-data; \
+    fi; \
+    if [ "$(id -u www-data)" != "${WWWUSER}" ]; then \
+        usermod -u ${WWWUSER} www-data; \
+    fi; \
+    mkdir -p /home/www-data/.composer/cache /home/www-data/.ssh; \
+    chown -R www-data:www-data /home/www-data; \
+    chmod 700 /home/www-data/.ssh
+
+ENV HOME=/home/www-data
+ENV COMPOSER_HOME=/home/www-data/.composer
+
 WORKDIR /var/www
 EXPOSE 9000
+USER www-data
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["php-fpm"]

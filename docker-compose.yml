@@ -40,14 +40,14 @@ x-php-volumes-v3: &php-volumes-v3
   - ./projects:/var/www
   - ./docker/php/conf/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
   - ./docker/php/conf/xdebug-v3.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
-  - composer_cache:/root/.composer/cache
+  - composer_cache:/home/www-data/.composer/cache
   - ~/.ssh:/ssh-host:ro
 
 x-php-volumes-v2: &php-volumes-v2
   - ./projects:/var/www
   - ./docker/php/conf/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
   - ./docker/php/conf/xdebug-v2.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
-  - composer_cache:/root/.composer/cache
+  - composer_cache:/home/www-data/.composer/cache
   - ~/.ssh:/ssh-host:ro
 
 services:
@@ -130,6 +130,8 @@ services:
       dockerfile: Dockerfile.8x
       args:
         PHP_VERSION: "8.3"
+        WWWUSER: ${WWWUSER:-1000}
+        WWWGROUP: ${WWWGROUP:-1000}
     container_name: php83
     volumes: *php-volumes-v3
     environment:
@@ -146,6 +148,8 @@ services:
       dockerfile: Dockerfile.8x
       args:
         PHP_VERSION: "8.2"
+        WWWUSER: ${WWWUSER:-1000}
+        WWWGROUP: ${WWWGROUP:-1000}
     container_name: php82
     volumes: *php-volumes-v3
     environment:
@@ -162,6 +166,8 @@ services:
       dockerfile: Dockerfile.8x
       args:
         PHP_VERSION: "8.1"
+        WWWUSER: ${WWWUSER:-1000}
+        WWWGROUP: ${WWWGROUP:-1000}
     container_name: php81
     volumes: *php-volumes-v3
     environment:
@@ -178,6 +184,8 @@ services:
       dockerfile: Dockerfile.8x
       args:
         PHP_VERSION: "8.0"
+        WWWUSER: ${WWWUSER:-1000}
+        WWWGROUP: ${WWWGROUP:-1000}
     container_name: php80
     volumes: *php-volumes-v3
     environment:
@@ -195,6 +203,8 @@ services:
       args:
         PHP_VERSION: "7.4"
         GD_CONFIGURE_FLAGS: "--with-freetype --with-jpeg"
+        WWWUSER: ${WWWUSER:-1000}
+        WWWGROUP: ${WWWGROUP:-1000}
     container_name: php74
     volumes: *php-volumes-v3
     environment:
@@ -212,6 +222,8 @@ services:
       args:
         PHP_VERSION: "7.3"
         GD_CONFIGURE_FLAGS: "--with-freetype-dir=/usr --with-jpeg-dir=/usr"
+        WWWUSER: ${WWWUSER:-1000}
+        WWWGROUP: ${WWWGROUP:-1000}
     container_name: php73
     volumes: *php-volumes-v3
     environment:
@@ -229,6 +241,8 @@ services:
       args:
         PHP_VERSION: "7.2"
         GD_CONFIGURE_FLAGS: "--with-freetype-dir=/usr --with-jpeg-dir=/usr"
+        WWWUSER: ${WWWUSER:-1000}
+        WWWGROUP: ${WWWGROUP:-1000}
     container_name: php72
     volumes: *php-volumes-v3
     environment:
@@ -246,6 +260,8 @@ services:
       args:
         PHP_VERSION: "7.1"
         XDEBUG_VERSION: "2.9.8"
+        WWWUSER: ${WWWUSER:-1000}
+        WWWGROUP: ${WWWGROUP:-1000}
     container_name: php71
     volumes: *php-volumes-v2
     environment:
@@ -263,6 +279,8 @@ services:
       args:
         PHP_VERSION: "7.0"
         XDEBUG_VERSION: "2.7.2"
+        WWWUSER: ${WWWUSER:-1000}
+        WWWGROUP: ${WWWGROUP:-1000}
     container_name: php70
     volumes: *php-volumes-v2
     environment:
