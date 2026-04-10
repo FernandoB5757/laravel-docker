@@ -22,11 +22,11 @@ http:
       priority: 1
 
     # phpMyAdmin
-    pma:
-      rule: "Host(`pma.test`)"
+    phpmyadmin:
+      rule: "Host(`phpmyadmin.test`)"
       entrypoints:
         - web
-      service: pma-svc
+      service: phpmyadmin-svc
       priority: 10
 
     # Mailhog
@@ -60,7 +60,7 @@ http:
         servers:
           - url: "http://172.20.0.3:80"
 
-    pma-svc:
+    phpmyadmin-svc:
       loadBalancer:
         servers:
           - url: "http://172.20.0.24:80"

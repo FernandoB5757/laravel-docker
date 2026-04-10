@@ -339,7 +339,7 @@ MEILISEARCH_HOST=http://meilisearch:7700
 | Redis          | `redis`       | `redis`        | 6379            | (Redis client: localhost:6379)|
 | Meilisearch    | `meilisearch` | `meilisearch`  | 7700            | http://meilisearch.test       |
 | Mailhog        | `mailhog`     | `mailhog`      | 1025, 8025      | http://mail.test              |
-| phpMyAdmin     | `phpmyadmin`  | `phpmyadmin`   | (via Traefik)   | http://pma.test               |
+| phpMyAdmin     | `phpmyadmin`  | `phpmyadmin`   | (via Traefik)   | http://phpmyadmin.test        |
 
 ---
 
@@ -404,6 +404,25 @@ Root access:
 ```
 User:     root
 Password: secret
+```
+
+### phpMyAdmin
+
+Browse and administer the databases from a browser at **http://phpmyadmin.test**.
+
+phpMyAdmin auto-logs in as **`root`** so you have full admin privileges out of the box — `CREATE` / `DROP DATABASE`, edit user privileges, manage grants, etc. This is intended for local development only; do not expose this stack to a network you don't control.
+
+The credentials come from `.env`:
+
+| phpMyAdmin var | Sourced from   | Default  |
+|----------------|----------------|----------|
+| `PMA_USER`     | hardcoded      | `root`   |
+| `PMA_PASSWORD` | `DB_ROOT_PASSWORD` | `secret` |
+
+If you change `DB_ROOT_PASSWORD` in `.env`, recreate the container so it picks up the new value:
+
+```bash
+docker compose up -d phpmyadmin
 ```
 
 ---

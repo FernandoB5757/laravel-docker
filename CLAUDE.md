@@ -104,7 +104,7 @@ Three Dockerfiles, selected by `docker-compose.yml` based on version:
 | `http://<project>.test` | Laravel project |
 | `http://traefik.test` | Traefik dashboard |
 | `http://mail.test` | Mailhog web UI |
-| `http://pma.test` | phpMyAdmin |
+| `http://phpmyadmin.test` | phpMyAdmin |
 | `http://meilisearch.test` | Meilisearch |
 
 ### MariaDB MCP Server
