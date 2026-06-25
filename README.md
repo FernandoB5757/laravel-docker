@@ -716,6 +716,55 @@ If you need an immediate fix without restarting:
 chmod -R 775 projects/myapp/storage projects/myapp/bootstrap/cache
 ```
 
+### Directories owned by `root` that PHP-FPM cannot write into
+
+Symptom: a Laravel job, export, or upload fails with something like:
+
+```
+Maatwebsite\Excel\Exceptions\LaravelExcelException: Permission denied to the storage path
+```
+
+or any "permission denied" writing under `storage/`, `content/`, `public/uploads/`, etc. Listing the directory on the host shows it is owned by `root:root` with `755`:
+
+```bash
+$ ls -la projects/myapp/content/reports/somefolder
+drwxr-xr-x 3 root root 4096 ... .
+```
+
+**Cause.** The directory was created by a process running as root inside a container — typically from an older build before UID remapping was in place, a previous `root-shell` session, or a manual `docker exec -u root`. PHP-FPM now runs as `www-data` (mapped to the host developer UID, `1000` by default), so it cannot write into a `root`-owned tree.
+
+**Fix.** Reassign ownership to the `www-data` user and set `setgid` on directories so new files created inside inherit the correct group. Run it from inside the container as root (avoids needing `sudo` on the host):
+
+```bash
+docker exec -u root <php-container> sh -c '
+  chown -R www-data:www-data /var/www/<project>/<path> &&
+  find /var/www/<project>/<path> -type d -exec chmod 2775 {} \; &&
+  find /var/www/<project>/<path> -type f -exec chmod 664 {} \;
+'
+```
+
+Example (project `myapp` running on `php70`, fixing `content/reports/somefolder`):
+
+```bash
+docker exec -u root php70 sh -c '
+  chown -R www-data:www-data /var/www/myapp/content/reports/somefolder &&
+  find /var/www/myapp/content/reports/somefolder -type d -exec chmod 2775 {} \; &&
+  find /var/www/myapp/content/reports/somefolder -type f -exec chmod 664 {} \;
+'
+```
+
+The equivalent host command requires `sudo` because only root can `chown` files currently owned by root:
+
+```bash
+sudo chown -R "$(id -u)":"$(id -g)" projects/myapp/<path>
+sudo find projects/myapp/<path> -type d -exec chmod 2775 {} \;
+sudo find projects/myapp/<path> -type f -exec chmod 664 {} \;
+```
+
+**Why `2775` on directories.** The leading `2` sets the setgid bit: any file or subdirectory created inside inherits the parent's group instead of the creator's primary group. Combined with PHP-FPM running as `www-data` (UID/GID matching the host developer user via `WWWUSER`/`WWWGROUP`), this keeps the tree writable from both the container and the host indefinitely.
+
+**Prevention.** Avoid creating project files with `docker exec -u root` or `./scripts/dev.sh root-shell`. Reserve root access for system tasks (`apk add`, installing extensions). All file creation (artisan, composer, editors) should go through the default `www-data` user.
+
 ---
 
 ## PHP Extension Summary

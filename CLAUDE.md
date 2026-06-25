@@ -8,7 +8,7 @@ A multi-project, multi-PHP-version local development platform for Laravel applic
 
 ## Common Commands
 
-All commands run from the workspace root (`/home/fernando/docker/laravel-docker`).
+All commands run from the workspace root (the directory containing `docker-compose.yml`).
 
 ```bash
 # Start / stop
