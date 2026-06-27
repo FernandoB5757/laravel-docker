@@ -77,6 +77,27 @@ local=/.test/
 
 # Do not consult /etc/hosts for .test resolution
 no-hosts
+
+# Do NOT derive upstream servers from /etc/resolv.conf.
+#
+# WHY THIS IS REQUIRED (do not remove):
+#   /etc/resolv.conf lists "nameserver 127.0.0.1" first (dnsmasq itself).
+#   If dnsmasq is allowed to read resolv.conf for its upstreams, it
+#   ignores the 127.0.0.1 self-reference to avoid a loop, and — if the
+#   public fallbacks aren't reliably present at startup — ends up with
+#   NO upstream and answers REFUSED to every non-.test query.
+#
+#   glibc clients (curl, ping) then fall through to 1.1.1.1 in
+#   resolv.conf and appear fine, but Node/c-ares-based clients
+#   (e.g. Claude Code) treat the REFUSED from the first nameserver as
+#   authoritative and never fall through — so their DNS breaks entirely.
+#
+#   no-resolv + explicit server= below makes upstream resolution fully
+#   deterministic: it never touches resolv.conf, so resolv.conf ordering
+#   and boot timing can no longer break it.
+no-resolv
+server=1.1.1.1
+server=8.8.8.8
 EOF
 echo "      dnsmasq configured."
 
@@ -85,8 +106,17 @@ echo "      dnsmasq configured."
 #
 # Ubuntu 24.04 may have /etc/resolv.conf as a symlink to
 # /run/systemd/resolve/stub-resolv.conf (127.0.0.53).
-# We replace it with a static file pointing to dnsmasq
-# on 127.0.0.1, with upstream public DNS as fallback.
+# We replace it with a static file pointing ONLY at dnsmasq.
+#
+# IMPORTANT: do NOT add public nameservers (1.1.1.1/8.8.8.8) here as a
+# "fallback". dnsmasq is the single resolver for the whole system and
+# already forwards non-.test queries upstream (see no-resolv + server=
+# in test-domains.conf). Listing public DNS here only reintroduces the
+# split-brain that caused the original outage: when dnsmasq returns
+# REFUSED, glibc clients (curl/ping) silently fall through to 1.1.1.1
+# and look healthy, while Node/c-ares clients (Claude Code) do NOT fall
+# through and break — masking the real problem. One resolver, one
+# behaviour for every client.
 # -------------------------------------------------------
 echo "[4/6] Updating /etc/resolv.conf..."
 # Remove the existing file or symlink
@@ -96,10 +126,9 @@ if [ -L /etc/resolv.conf ] || [ -f /etc/resolv.conf ]; then
 fi
 cat > /etc/resolv.conf << 'EOF'
 # /etc/resolv.conf — managed by setup-dns.sh (Laravel Docker Platform)
-# dnsmasq handles *.test; public DNS is the fallback for everything else.
+# dnsmasq (127.0.0.1) is the ONLY resolver: it answers *.test locally and
+# forwards everything else upstream. Do not add public nameservers here.
 nameserver 127.0.0.1
-nameserver 1.1.1.1
-nameserver 8.8.8.8
 search local
 EOF
 echo "      /etc/resolv.conf updated."
